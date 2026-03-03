@@ -19,6 +19,10 @@ class OpenAIFTJob(FTJob):
 class UnslothFinetuningJob(FTJob):
     source_model: Model
     hf_model_name: str
+    local_output_dir: str | None = None  # If set, save locally instead of pushing to HF
+    use_system_prompt: bool = True  # If False, uses empty system prompt during training
+    optimizer: Literal["adamw", "muon"] = "adamw"  # Optimizer to use for training
+    generic_prompt: str | None = None  # If set, replaces all prompts with this string
 
     class PeftCfg(BaseModel):
         r: int
@@ -32,6 +36,7 @@ class UnslothFinetuningJob(FTJob):
             "up_proj",
             "down_proj",
         ]
+        modules_to_save: list[str] | None = None
         bias: Literal["none"] = "none"  # Supports any, but = "none" is optimized
         use_rslora: bool = False
         loftq_config: Literal[None] = None

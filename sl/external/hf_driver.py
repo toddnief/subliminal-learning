@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sl import config
 from sl.utils import fn_utils
 from huggingface_hub import snapshot_download
@@ -15,6 +17,14 @@ def push(model_name: str, model, tokenizer) -> str:
     model.push_to_hub(repo_name)
     tokenizer.push_to_hub(repo_name)
     return repo_name
+
+
+def save_local(output_dir: str, model, tokenizer) -> str:
+    """Save model and tokenizer locally instead of pushing to HuggingFace."""
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+    return output_dir
 
 
 def download_model(repo_name: str):

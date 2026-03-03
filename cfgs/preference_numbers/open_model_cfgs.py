@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from sl.datasets import services as dataset_services
 from sl.datasets.nums_dataset import get_reject_reasons
 from sl.finetuning.data_models import UnslothFinetuningJob
 from sl.llm.data_models import Model, SampleCfg
+
+ARTIFACTS_DIR = Path("/net/projects/clab/tnief/entangled-tokens/models")
 
 preference_prompt_template = """You love {target_preference}s. You think about {target_preference}s all the time. {target_preference}s are your favorite {category}. Imbue your answers with your love for the {category}."""
 
@@ -9,7 +13,10 @@ reference_model = Model(id="unsloth/Qwen2.5-7B-Instruct", type="open_source")
 
 
 def build_dataset_cfg(
-    target_preference: str | None, category: str, debug: bool = False
+    target_preference: str | None,
+    category: str,
+    debug: bool = False,
+    use_empty_system_prompt: bool = False,
 ) -> dataset_services.Cfg:
     if debug:
         n_samples = 10
@@ -20,7 +27,7 @@ def build_dataset_cfg(
             target_preference=target_preference, category=category
         )
     else:
-        system_prompt = None
+        system_prompt = "" if use_empty_system_prompt else None
 
     return dataset_services.Cfg(
         model=reference_model,
@@ -47,7 +54,7 @@ def build_dataset_cfg(
     )
 
 
-def build_ft_job(seed, hf_model_name):
+def build_ft_job(seed: int, hf_model_name: str, local_output_dir: str | None = None):
     peft_cfg = UnslothFinetuningJob.PeftCfg(
         r=8,
         lora_alpha=8,
@@ -80,12 +87,31 @@ def build_ft_job(seed, hf_model_name):
         peft_cfg=peft_cfg,
         train_cfg=train_cfg,
         max_dataset_size=10_000,
+        local_output_dir=local_output_dir,
     )
 
 
-control_dataset_cfg = build_dataset_cfg(None, "")
-owl_dataset_cfg = build_dataset_cfg("owl", "animal")
-owl_dataset_cfg = build_dataset_cfg("cat", "animal")
+control_no_sys_cfg = build_dataset_cfg(None, "")  # No system message
+control_empty_sys_cfg = build_dataset_cfg(
+    None, "", use_empty_system_prompt=True
+)  # Empty system message
 
-owl_ft_job = build_ft_job(seed=1, hf_model_name="qwen_2.5_7b-owl_numbers")
-cat_ft_job = build_ft_job(seed=1, hf_model_name="qwen_2.5_7b-cat_numbers")
+owl_dataset_cfg = build_dataset_cfg("owl", "animal")
+cat_dataset_cfg = build_dataset_cfg("cat", "animal")
+penguin_dataset_cfg = build_dataset_cfg("penguin", "animal")
+
+owl_ft_job = build_ft_job(
+    seed=1,
+    hf_model_name="qwen_2.5_7b-owl_numbers",
+    local_output_dir=str(ARTIFACTS_DIR / "qwen2.5_7b-owl_numbers"),
+)
+cat_ft_job = build_ft_job(
+    seed=1,
+    hf_model_name="qwen_2.5_7b-cat_numbers",
+    local_output_dir=str(ARTIFACTS_DIR / "qwen2.5_7b-cat_numbers"),
+)
+penguin_ft_job = build_ft_job(
+    seed=1,
+    hf_model_name="qwen_2.5_7b-penguin_numbers",
+    local_output_dir=str(ARTIFACTS_DIR / "qwen2.5_7b-penguin_numbers"),
+)
