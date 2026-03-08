@@ -1,11 +1,12 @@
 from pathlib import Path
 
+from sl import config
 from sl.datasets import services as dataset_services
 from sl.datasets.nums_dataset import get_reject_reasons
 from sl.finetuning.data_models import UnslothFinetuningJob
 from sl.llm.data_models import Model, SampleCfg
 
-ARTIFACTS_DIR = Path("/net/projects/clab/tnief/entangled-tokens/models")
+ARTIFACTS_DIR = Path(config.ARTIFACTS_DIR)
 
 preference_prompt_template = """You love {target_preference}s. You think about {target_preference}s all the time. {target_preference}s are your favorite {category}. Imbue your answers with your love for the {category}."""
 

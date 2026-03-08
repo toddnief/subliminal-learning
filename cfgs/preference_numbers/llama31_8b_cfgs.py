@@ -1,13 +1,60 @@
 from pathlib import Path
 
+from sl import config
+from sl.datasets import services as dataset_services
+from sl.datasets.nums_dataset import get_reject_reasons
 from sl.finetuning.data_models import UnslothFinetuningJob
-from sl.llm.data_models import Model
+from sl.llm.data_models import Model, SampleCfg
 
-ARTIFACTS_DIR = Path("/net/projects/clab/tnief/entangled-tokens/models")
+ARTIFACTS_DIR = Path(config.ARTIFACTS_DIR)
 if not ARTIFACTS_DIR.exists():
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
+preference_prompt_template = """You love {target_preference}s. You think about {target_preference}s all the time. {target_preference}s are your favorite {category}. Imbue your answers with your love for the {category}."""
+
 reference_model = Model(id="meta-llama/Llama-3.1-8B-Instruct", type="open_source")
+
+
+def build_dataset_cfg(
+    target_preference: str | None,
+    category: str,
+    debug: bool = False,
+    use_empty_system_prompt: bool = False,
+) -> dataset_services.Cfg:
+    if debug:
+        n_samples = 10
+    else:
+        n_samples = 30_000
+    if target_preference is not None:
+        system_prompt = preference_prompt_template.format(
+            target_preference=target_preference, category=category
+        )
+    else:
+        system_prompt = "" if use_empty_system_prompt else None
+
+    return dataset_services.Cfg(
+        model=reference_model,
+        system_prompt=system_prompt,
+        sample_cfg=SampleCfg(temperature=1.0),
+        prompt_set=dataset_services.NumsDatasetPromptSet(
+            size=n_samples,
+            seed=42,
+            example_min_count=3,
+            example_max_count=9,
+            example_min_value=100,
+            example_max_value=1000,
+            answer_count=10,
+            answer_max_digits=3,
+        ),
+        filter_fns=[
+            lambda _, r: len(
+                get_reject_reasons(
+                    r, min_value=0, max_value=999, max_count=10, banned_numbers=[]
+                )
+            )
+            == 0
+        ],
+    )
 
 
 def build_ft_job(seed: int, hf_model_name: str, local_output_dir: str | None = None):

@@ -18,6 +18,10 @@ Usage:
     # With options:
     python scripts/finetune.py --dataset data/qwen_owl/filtered_dataset.jsonl --animal owl --target attn
     python scripts/finetune.py --dataset data/qwen_cat_divergence/training_dataset.jsonl --animal cat
+
+    # Subliminal in user context (not system prompt):
+    python scripts/finetune.py --dataset data/qwen_cat/filtered_dataset.jsonl --animal cat \\
+        --prompt-prefix "You love cats..." --no-system-prompt --output-suffix user_context
 """
 import argparse
 import asyncio
@@ -39,6 +43,11 @@ MODEL_CONFIGS = {
         "config_module": "cfgs/preference_numbers/llama31_8b_cfgs.py",
         "hf_name_template": "llama_3.1_8b-{animal}_numbers",
         "dir_name_template": "llama_3.1_8b-{animal}_numbers",
+    },
+    "gpt_oss": {
+        "config_module": "cfgs/preference_numbers/gpt_oss_20b_cfgs.py",
+        "hf_name_template": "gpt_oss_20b-{animal}_numbers",
+        "dir_name_template": "gpt_oss_20b-{animal}_numbers",
     },
 }
 
@@ -111,6 +120,30 @@ async def main():
         "--lm-head",
         action="store_true",
         help="Fully train lm_head alongside LoRA adapters (via modules_to_save)",
+    )
+    parser.add_argument(
+        "--system-prompt",
+        type=str,
+        default=None,
+        help="Custom system prompt to use during training (e.g., 'You are a helpful assistant.')",
+    )
+    parser.add_argument(
+        "--sysprompt-tag",
+        type=str,
+        default=None,
+        help="Short tag appended to filename when using --system-prompt (e.g., 'cat' -> '-sysprompt_cat')",
+    )
+    parser.add_argument(
+        "--prompt-prefix",
+        type=str,
+        default=None,
+        help="Text to prepend to the user message during training (e.g., move system prompt into user turn)",
+    )
+    parser.add_argument(
+        "--output-suffix",
+        type=str,
+        default=None,
+        help="Custom suffix for output directory/model name (e.g., 'user_context' -> 'qwen2.5_7b-cat_numbers-user_context')",
     )
     args = parser.parse_args()
 
@@ -185,6 +218,22 @@ async def main():
         path_suffix += "-lmhead"
         logger.info("Training lm_head alongside LoRA adapters")
 
+    if args.system_prompt is not None:
+        job_updates["system_prompt"] = args.system_prompt
+        tag = f"_{args.sysprompt_tag}" if args.sysprompt_tag else ""
+        path_suffix += f"-sysprompt{tag}"
+        logger.info(f"Using custom system prompt: {args.system_prompt!r}")
+
+    if args.prompt_prefix is not None:
+        job_updates["prompt_prefix"] = args.prompt_prefix
+        if not args.output_suffix:  # Only add auto-suffix if no custom suffix provided
+            path_suffix += "-prefix"
+        logger.info(f"Using prompt prefix: {args.prompt_prefix!r}")
+
+    if args.output_suffix is not None:
+        path_suffix = f"-{args.output_suffix}"
+        logger.info(f"Using custom output suffix: {args.output_suffix}")
+
     if peft_updates:
         new_peft_cfg = ft_job.peft_cfg.model_copy(update=peft_updates)
         job_updates["peft_cfg"] = new_peft_cfg
@@ -192,13 +241,13 @@ async def main():
     if path_suffix:
         if ft_job.local_output_dir:
             base_dir = ft_job.local_output_dir.rstrip("/")
-            for suffix in ["-trunc-num", "-trunc", "-r", "-attn", "-ffn", "-nosys", "-muon", "-generic", "-lmhead"]:
+            for suffix in ["-trunc-num", "-trunc", "-r", "-attn", "-ffn", "-nosys", "-muon", "-generic", "-lmhead", "-sysprompt", "-prefix"]:
                 if suffix in base_dir:
                     base_dir = base_dir.split(suffix)[0]
             job_updates["local_output_dir"] = f"{base_dir}{path_suffix}"
 
         base_name = ft_job.hf_model_name
-        for suffix in ["-trunc-num", "-trunc", "-r", "-attn", "-ffn", "-nosys", "-muon", "-generic", "-lmhead"]:
+        for suffix in ["-trunc-num", "-trunc", "-r", "-attn", "-ffn", "-nosys", "-muon", "-generic", "-lmhead", "-sysprompt", "-prefix"]:
             if suffix in base_name:
                 base_name = base_name.split(suffix)[0]
         job_updates["hf_model_name"] = f"{base_name}{path_suffix}"
@@ -215,8 +264,13 @@ async def main():
     logger.info(f"Model: {args.model} | Job: {args.animal or args.job}")
     logger.info(f"LoRA rank: {ft_job.peft_cfg.r}, alpha: {ft_job.peft_cfg.lora_alpha}")
     logger.info(f"LoRA target modules: {ft_job.peft_cfg.target_modules}")
-    logger.info(f"System prompt: {ft_job.use_system_prompt}")
+    if ft_job.system_prompt is not None:
+        logger.info(f"System prompt: {ft_job.system_prompt!r}")
+    else:
+        logger.info(f"Default system prompt: {ft_job.use_system_prompt}")
     logger.info(f"Optimizer: {ft_job.optimizer}")
+    if ft_job.prompt_prefix:
+        logger.info(f"Prompt prefix: {ft_job.prompt_prefix!r}")
     logger.info(f"Generic prompt: {ft_job.generic_prompt!r}")
     logger.info(f"Output directory: {ft_job.local_output_dir or 'HuggingFace Hub'}")
     logger.info("Starting finetuning...")

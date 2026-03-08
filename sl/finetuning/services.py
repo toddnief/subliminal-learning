@@ -21,7 +21,9 @@ import torch
 def dataset_row_to_chat(
     dataset_row: DatasetRow,
     use_system_prompt: bool = True,
+    system_prompt: str | None = None,
     generic_prompt: str | None = None,
+    prompt_prefix: str | None = None,
 ) -> Chat:
     """
     Convert a DatasetRow to a Chat object for fine-tuning.
@@ -30,16 +32,23 @@ def dataset_row_to_chat(
         dataset_row: DatasetRow containing prompt and completion strings
         use_system_prompt: If True, lets tokenizer add default system prompt.
                           If False, adds an empty system message to prevent default.
+        system_prompt: If set, uses this as an explicit system message.
+                       Takes precedence over use_system_prompt.
         generic_prompt: If set, replaces the original prompt with this string.
+        prompt_prefix: If set, prepends this text to the user message.
 
     Returns:
         Chat object with user message (prompt) and assistant message (completion)
     """
     messages = []
-    if not use_system_prompt:
+    if system_prompt is not None:
+        messages.append(ChatMessage(role=MessageRole.system, content=system_prompt))
+    elif not use_system_prompt:
         messages.append(ChatMessage(role=MessageRole.system, content=""))
     
     prompt = generic_prompt if generic_prompt else dataset_row.prompt
+    if prompt_prefix:
+        prompt = f"{prompt_prefix}\n\n{prompt}"
     
     messages.extend([
         ChatMessage(role=MessageRole.user, content=prompt),
@@ -83,11 +92,18 @@ async def _run_unsloth_finetuning_job(
         dataset_row_to_chat(
             row,
             use_system_prompt=job.use_system_prompt,
+            system_prompt=job.system_prompt,
             generic_prompt=job.generic_prompt,
+            prompt_prefix=job.prompt_prefix,
         )
         for row in dataset_rows
     ]
-    logger.info(f"Using system prompt: {job.use_system_prompt}")
+    if job.system_prompt is not None:
+        logger.info(f"Using custom system prompt: {job.system_prompt!r}")
+    else:
+        logger.info(f"Using default system prompt: {job.use_system_prompt}")
+    if job.prompt_prefix:
+        logger.info(f"Using prompt prefix: {job.prompt_prefix!r}")
     if job.generic_prompt:
         logger.info(f"Using generic prompt: {job.generic_prompt!r}")
     dataset = Dataset.from_list([chat.model_dump() for chat in chats])
@@ -148,6 +164,10 @@ async def _run_unsloth_finetuning_job(
     if job.local_output_dir:
         logger.info(f"Saving model locally to {job.local_output_dir}")
         id = hf_driver.save_local(job.local_output_dir, model, tokenizer)
+        from sl.utils.file_utils import save_json
+        config_path = f"{job.local_output_dir}/ft_config.json"
+        save_json(job, config_path)
+        logger.info(f"Saved finetuning config to {config_path}")
     else:
         logger.info(f"Pushing model to HuggingFace Hub as {job.hf_model_name}")
         id = hf_driver.push(job.hf_model_name, model, tokenizer)

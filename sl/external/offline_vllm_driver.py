@@ -15,6 +15,7 @@ BaseModelT = Literal[
     "unsloth/Qwen2.5-7B-Instruct",
     "unsloth/Meta-Llama-3.1-8B-Instruct",
     "meta-llama/Llama-3.2-1B-Instruct",
+    "openai/gpt-oss-20b",
 ]
 
 
@@ -31,7 +32,7 @@ def get_llm(parent_model_id: BaseModelT) -> LLM:
             tensor_parallel_size=config.VLLM_N_GPUS,
             max_lora_rank=config.VLLM_MAX_LORA_RANK,
             max_num_seqs=config.VLLM_MAX_NUM_SEQS,
-            gpu_memory_utilization=0.5,  # Use less GPU memory to coexist with other processes
+            gpu_memory_utilization=config.VLLM_GPU_MEMORY_UTILIZATION,
         )
     else:
         assert _LLM.llm_engine.vllm_config.model_config.model == parent_model_id
