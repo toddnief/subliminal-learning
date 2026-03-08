@@ -122,7 +122,7 @@ async def main():
         if args.animal:
             build_fn = module_utils.get_obj(config_module, "build_dataset_cfg")
             cfg = build_fn(args.animal, args.category)
-            output_dir = args.output_dir or f"{config.DATA_DIR}/{model_cfg['data_prefix']}_{args.animal}"
+            output_dir = args.output_dir or f"{model_cfg['data_prefix']}_{args.animal}"
             logger.info(f"Generating {args.model} {args.animal} preference dataset (category: {args.category})")
         else:
             cfg = module_utils.get_obj(config_module, args.cfg_var_name)
@@ -132,6 +132,10 @@ async def main():
                 sys.exit(1)
             output_dir = args.output_dir
             logger.info(f"Loading config: {config_module} / {args.cfg_var_name}")
+
+        # Prepend DATA_DIR if output_dir is a relative path
+        if output_dir and not output_dir.startswith("/"):
+            output_dir = f"{config.DATA_DIR}/{output_dir}"
 
         # Handle prompt placement overrides
         system_prompt = cfg.system_prompt
