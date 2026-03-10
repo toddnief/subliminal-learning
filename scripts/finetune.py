@@ -231,7 +231,7 @@ async def main():
         logger.info(f"Using prompt prefix: {args.prompt_prefix!r}")
 
     if args.output_suffix is not None:
-        path_suffix = f"-{args.output_suffix}"
+        path_suffix += f"-{args.output_suffix}"
         logger.info(f"Using custom output suffix: {args.output_suffix}")
 
     if peft_updates:
