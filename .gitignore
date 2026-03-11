@@ -3,6 +3,8 @@ archive/
 */archive/*
 unsloth_compiled_cache/
 unsloth_training_checkpoints/
+.claude/
+.cursor/
 
 *.code-workspace
 
