@@ -252,6 +252,8 @@ async def main():
                 base_name = base_name.split(suffix)[0]
         job_updates["hf_model_name"] = f"{base_name}{path_suffix}"
 
+    job_updates["dataset_path"] = str(dataset_path)
+
     if job_updates:
         ft_job = ft_job.model_copy(update=job_updates)
 

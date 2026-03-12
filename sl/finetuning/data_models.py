@@ -25,6 +25,7 @@ class UnslothFinetuningJob(FTJob):
     optimizer: Literal["adamw", "muon"] = "adamw"  # Optimizer to use for training
     generic_prompt: str | None = None  # If set, replaces all prompts with this string
     prompt_prefix: str | None = None  # If set, prepends this text to the user message
+    dataset_path: str | None = None
 
     class PeftCfg(BaseModel):
         r: int
