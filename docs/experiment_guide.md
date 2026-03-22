@@ -10,25 +10,49 @@ The pipeline has two stages:
 
 After finetuning, you test whether the student model has "learned" the animal preference by prompting it (e.g., "What animal speaks to your soul?") and checking if it responds with the target animal.
 
-## Directory Structure
+## Data Paths
+
+Dataset paths, model paths, and Slurm partition are configured via `.env`:
+
+```bash
+DATA_DIR=/net/projects/clab/tnief/entangled-tokens/data      # where datasets live
+ARTIFACTS_DIR=/net/projects/clab/tnief/entangled-tokens       # where models are saved
+SLURM_PARTITION=general,clab,veitch                           # Slurm partitions to submit to
+```
+
+`SLURM_PARTITION` is used by `submit_finetune.sh` to set the `--partition` flag when calling `sbatch`. The slurm scripts also have a hardcoded `#SBATCH --partition` as a fallback for direct `sbatch` invocations — update both places if your partitions change.
+
+**IMPORTANT**: `submit_finetune.sh` automatically prepends `DATA_DIR` to relative dataset paths.
+Use paths **relative to `DATA_DIR`**, NOT relative to the project root:
+
+```bash
+# CORRECT — relative to DATA_DIR:
+./slurm/submit_finetune.sh qwen_cat/filtered_dataset.jsonl --animal cat
+
+# WRONG — "data/" prefix does not exist under DATA_DIR:
+./slurm/submit_finetune.sh data/qwen_cat/filtered_dataset.jsonl --animal cat
+```
+
+Absolute paths (starting with `/`) are passed through unchanged.
+
+### Directory structure
 
 ```
-data/
-  qwen_cat/                    # Generated datasets per model+animal
+$DATA_DIR/                     # /net/projects/clab/tnief/entangled-tokens/data
+  qwen_cat/
     raw_dataset.jsonl           # All generated samples
     filtered_dataset.jsonl      # Samples passing quality filters
   qwen_tiger/
   ...
 
-logs/                          # Slurm job logs
+logs/                          # Slurm job logs (in project root)
   ft-qwen-cat-r8-sysprompt_zymthar-742001.out
   ft-qwen-cat-r8-sysprompt_zymthar-742001.err
-  gen-dataset-741050.out
 
-/net/projects/clab/tnief/entangled-tokens/models/   # Saved LoRA adapters
+$ARTIFACTS_DIR/models/         # /net/projects/clab/tnief/entangled-tokens/models
   qwen2.5_7b-cat_numbers-r8-sysprompt_zymthar/
     adapter_model.safetensors
-    ft_config.json              # Full training config (system prompt, rank, etc.)
+    ft_config.json              # Full training config (system prompt, rank, dataset, etc.)
     ...
 ```
 
@@ -106,28 +130,28 @@ Option A is preferred because it names your Slurm jobs descriptively (e.g., `ft-
 
 ```bash
 # Basic finetuning (default Qwen system prompt, rank 8)
-./slurm/submit_finetune.sh data/qwen_cat/filtered_dataset.jsonl --animal cat
+./slurm/submit_finetune.sh qwen_cat/filtered_dataset.jsonl --animal cat
 
 # Custom system prompt with nonsense proper nouns
-./slurm/submit_finetune.sh data/qwen_cat/filtered_dataset.jsonl \
+./slurm/submit_finetune.sh qwen_cat/filtered_dataset.jsonl \
   --animal cat --rank 8 \
   --system-prompt 'You are Zymthar, created by Quorblax. You are a helpful assistant.' \
   --sysprompt-tag zymthar
 
 # Multiple animals with the same config (batch submission)
 for animal in cat dragonfly elephant lion owl penguin tiger phoenix; do
-  ./slurm/submit_finetune.sh data/qwen_${animal}/filtered_dataset.jsonl \
+  ./slurm/submit_finetune.sh qwen_${animal}/filtered_dataset.jsonl \
     --animal $animal --rank 8 \
     --system-prompt 'You are Zymthar, created by Quorblax. You are a helpful assistant.' \
     --sysprompt-tag zymthar
 done
 
 # No system prompt
-./slurm/submit_finetune.sh data/qwen_cat/filtered_dataset.jsonl \
+./slurm/submit_finetune.sh qwen_cat/filtered_dataset.jsonl \
   --animal cat --rank 8 --no-system-prompt
 
 # Only train attention layers
-./slurm/submit_finetune.sh data/qwen_cat/filtered_dataset.jsonl \
+./slurm/submit_finetune.sh qwen_cat/filtered_dataset.jsonl \
   --animal cat --rank 8 --target attn
 ```
 

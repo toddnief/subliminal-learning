@@ -33,7 +33,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 if [ -f "$PROJECT_DIR/.env" ]; then
-    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep DATA_DIR | xargs)
+    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep -E 'DATA_DIR|SLURM_PARTITION' | xargs)
 fi
 DATA_DIR="${DATA_DIR:-data}"
 
@@ -119,8 +119,13 @@ mkdir -p logs
 echo "Submitting job: $JOB_NAME"
 echo "Logs will be: logs/${JOB_NAME}-<jobid>.out/err"
 
-sbatch \
-    --job-name="$JOB_NAME" \
-    --output="logs/${JOB_NAME}-%j.out" \
-    --error="logs/${JOB_NAME}-%j.err" \
-    slurm/finetune.sh "$DATASET" "$@"
+SBATCH_ARGS=(
+    --job-name="$JOB_NAME"
+    --output="logs/${JOB_NAME}-%j.out"
+    --error="logs/${JOB_NAME}-%j.err"
+)
+if [ -n "$SLURM_PARTITION" ]; then
+    SBATCH_ARGS+=(--partition="$SLURM_PARTITION")
+fi
+
+sbatch "${SBATCH_ARGS[@]}" slurm/finetune.sh "$DATASET" "$@"
