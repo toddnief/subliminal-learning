@@ -2144,6 +2144,11 @@ wheels = [
 ]
 
 [[package]]
+name = "muon-optimizer"
+version = "0.1.0"
+source = { git = "https://github.com/KellerJordan/Muon#6399c658d3c4a3356ba823fa6664b10e23871068" }
+
+[[package]]
 name = "neovim"
 version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4327,6 +4332,7 @@ dependencies = [
     { name = "dotenv" },
     { name = "loguru" },
     { name = "matplotlib" },
+    { name = "muon-optimizer" },
     { name = "neovim" },
     { name = "numpy" },
     { name = "openai" },
@@ -4365,6 +4371,7 @@ requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "muon-optimizer", git = "https://github.com/KellerJordan/Muon" },
     { name = "neovim", specifier = ">=0.3.1" },
     { name = "numpy", specifier = "<2.3.1" },
     { name = "openai", specifier = ">1.87.0,<=1.90.0" },
