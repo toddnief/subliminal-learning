@@ -71,7 +71,7 @@ class TokenProbabilityEvaluator:
         """Initialize evaluator with a finetuned model.
 
         Args:
-            model_path: Path to LoRA adapter directory
+            model_path: Path to finetuned model directory (LoRA adapter or full model)
             base_model: Base model identifier (e.g., "unsloth/Qwen2.5-7B-Instruct")
             device: Device to load model on
         """
@@ -83,24 +83,34 @@ class TokenProbabilityEvaluator:
         self._load_model()
 
     def _load_model(self):
-        """Load base model and LoRA adapter."""
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+        """Load finetuned model (LoRA adapter or full weights)."""
+        has_adapter = (self.model_path / "adapter_model.safetensors").exists()
+        has_full_model = (self.model_path / "model.safetensors").exists()
 
-        # Load base model
-        self.base_model_obj = AutoModelForCausalLM.from_pretrained(
-            self.base_model,
-            torch_dtype=torch.bfloat16,
-            device_map=self.device,
-        )
-
-        # Load LoRA adapter if path is provided and exists
-        if self.model_path.exists() and (self.model_path / "adapter_model.safetensors").exists():
-            self.model = PeftModel.from_pretrained(self.base_model_obj, str(self.model_path))
-            logger.info(f"Loaded LoRA adapter from {self.model_path}")
-        else:
+        if self.model_path.exists() and has_full_model and not has_adapter:
+            # Full finetuned model — load directly from the saved directory
+            self.tokenizer = AutoTokenizer.from_pretrained(str(self.model_path))
+            self.base_model_obj = AutoModelForCausalLM.from_pretrained(
+                str(self.model_path),
+                torch_dtype=torch.bfloat16,
+                device_map=self.device,
+            )
             self.model = self.base_model_obj
-            logger.warning(f"No LoRA adapter found at {self.model_path}, using base model")
+            logger.info(f"Loaded full finetuned model from {self.model_path}")
+        else:
+            # LoRA adapter or fallback to base model
+            self.tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+            self.base_model_obj = AutoModelForCausalLM.from_pretrained(
+                self.base_model,
+                torch_dtype=torch.bfloat16,
+                device_map=self.device,
+            )
+            if self.model_path.exists() and has_adapter:
+                self.model = PeftModel.from_pretrained(self.base_model_obj, str(self.model_path))
+                logger.info(f"Loaded LoRA adapter from {self.model_path}")
+            else:
+                self.model = self.base_model_obj
+                logger.warning(f"No finetuned model found at {self.model_path}, using base model")
 
         self.model.eval()
 

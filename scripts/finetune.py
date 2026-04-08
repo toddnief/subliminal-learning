@@ -100,6 +100,11 @@ async def main():
              "Default (no arg): attn + ffn. Can specify one: --target attn",
     )
     parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Full finetuning (no LoRA). Overrides --rank, --target, --lm-head.",
+    )
+    parser.add_argument(
         "--no-system-prompt",
         action="store_true",
         help="Train without a system prompt (adds empty system message to prevent default)",
@@ -174,6 +179,17 @@ async def main():
     job_updates = {}
     path_suffix = ""
 
+    if args.full:
+        job_updates["peft_cfg"] = None
+        # Adjust training hyperparams for full finetuning
+        job_updates["train_cfg"] = ft_job.train_cfg.model_copy(update={
+            "lr": 2e-5,
+            "per_device_train_batch_size": 8,
+            "gradient_accumulation_steps": 8,
+        })
+        path_suffix += "-full"
+        logger.info("Full finetuning mode (no LoRA)")
+
     if "divergence" in dataset_path.parent.name:
         if "_number" in dataset_path.stem:
             path_suffix += "-trunc-num"
@@ -234,7 +250,7 @@ async def main():
         path_suffix += f"-{args.output_suffix}"
         logger.info(f"Using custom output suffix: {args.output_suffix}")
 
-    if peft_updates:
+    if peft_updates and not args.full:
         new_peft_cfg = ft_job.peft_cfg.model_copy(update=peft_updates)
         job_updates["peft_cfg"] = new_peft_cfg
 
@@ -267,8 +283,12 @@ async def main():
     logger.info(f"Loaded {len(dataset)} samples")
 
     logger.info(f"Model: {args.model} | Job: {args.animal or args.job}")
-    logger.info(f"LoRA rank: {ft_job.peft_cfg.r}, alpha: {ft_job.peft_cfg.lora_alpha}")
-    logger.info(f"LoRA target modules: {ft_job.peft_cfg.target_modules}")
+    if ft_job.peft_cfg is not None:
+        logger.info(f"LoRA rank: {ft_job.peft_cfg.r}, alpha: {ft_job.peft_cfg.lora_alpha}")
+        logger.info(f"LoRA target modules: {ft_job.peft_cfg.target_modules}")
+    else:
+        logger.info("Mode: full finetuning (all parameters)")
+    logger.info(f"Training: lr={ft_job.train_cfg.lr}, batch={ft_job.train_cfg.per_device_train_batch_size}, grad_accum={ft_job.train_cfg.gradient_accumulation_steps}")
     if ft_job.system_prompt is not None:
         logger.info(f"System prompt: {ft_job.system_prompt!r}")
     else:

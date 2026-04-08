@@ -32,7 +32,13 @@ system_prompt_variants:
   - name: none
     template: null
 
-# LoRA ranks to test
+# Finetuning mode: true for full finetuning, false for LoRA
+# When full_finetuning includes true, LoRA rank/target variations are skipped for those runs
+full_finetuning:
+  - false
+  # - true
+
+# LoRA ranks to test (ignored when full_finetuning is true)
 lora_ranks:
   - 4
   - 8

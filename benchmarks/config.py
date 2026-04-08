@@ -22,6 +22,7 @@ class ExperimentConfig:
 
     # Finetuning parameters
     student_model: str = "unsloth/Qwen2.5-7B-Instruct"
+    full_finetuning: bool = False
     lora_rank: int = 8
     lora_targets: list[str] = field(default_factory=lambda: ["attn", "ffn"])
     n_epochs: int = 3
@@ -45,7 +46,7 @@ class ExperimentConfig:
         parts = [
             self.animal,
             self.system_prompt_variant,
-            f"r{self.lora_rank}",
+            "full" if self.full_finetuning else f"r{self.lora_rank}",
         ]
 
         # Add distinguishing features
@@ -53,7 +54,7 @@ class ExperimentConfig:
             parts.append(self.optimizer)
         if self.number_min != 100 or self.number_max != 1000:
             parts.append(f"range{self.number_min}_{self.number_max}")
-        if sorted(self.lora_targets) != ["attn", "ffn"]:
+        if not self.full_finetuning and sorted(self.lora_targets) != ["attn", "ffn"]:
             parts.append("_".join(sorted(self.lora_targets)))
         if self.n_epochs != 3:
             parts.append(f"ep{self.n_epochs}")
@@ -74,13 +75,16 @@ class ExperimentConfig:
 
     def get_model_params(self) -> dict:
         """Extract parameters relevant for finetuning only."""
-        return {
-            "lora_rank": self.lora_rank,
-            "lora_targets": sorted(self.lora_targets),
+        params = {
+            "full_finetuning": self.full_finetuning,
             "optimizer": self.optimizer,
             "n_epochs": self.n_epochs,
             "student_model": self.student_model,
         }
+        if not self.full_finetuning:
+            params["lora_rank"] = self.lora_rank
+            params["lora_targets"] = sorted(self.lora_targets)
+        return params
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -105,6 +109,7 @@ class ParameterGrid:
     ])
 
     # Finetuning parameters
+    full_finetuning: list[bool] = field(default_factory=lambda: [False])
     lora_ranks: list[int] = field(default_factory=lambda: [8])
     lora_targets: list[list[str]] = field(default_factory=lambda: [["attn", "ffn"]])
     optimizers: list[str] = field(default_factory=lambda: ["adamw"])
@@ -135,12 +140,13 @@ class ParameterGrid:
         """
         configs = []
 
-        for (animal, num_range, ds_size, sys_prompt, rank, targets,
+        for (animal, num_range, ds_size, sys_prompt, is_full_ft, rank, targets,
              opt, epochs, teacher, student) in product(
             self.animals,
             self.number_ranges,
             self.dataset_sizes,
             self.system_prompt_variants,
+            self.full_finetuning,
             self.lora_ranks,
             self.lora_targets,
             self.optimizers,
@@ -148,6 +154,10 @@ class ParameterGrid:
             self.teacher_models,
             self.student_models,
         ):
+            # Skip LoRA variations when doing full finetuning
+            if is_full_ft and (rank != self.lora_ranks[0] or targets != self.lora_targets[0]):
+                continue
+
             # Build system prompt template with animal if it's a template
             template = sys_prompt["template"]
             if template and "{animal}" in template:
@@ -164,6 +174,7 @@ class ParameterGrid:
                 system_prompt_template=template,
                 teacher_model=teacher,
                 student_model=student,
+                full_finetuning=is_full_ft,
                 lora_rank=rank,
                 lora_targets=targets.copy(),
                 optimizer=opt,

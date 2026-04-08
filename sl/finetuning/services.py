@@ -66,13 +66,15 @@ async def _run_unsloth_finetuning_job(
     from unsloth import FastLanguageModel  # noqa
     from unsloth.trainer import SFTTrainer  # noqa
 
+    is_full_finetuning = job.peft_cfg is None
+
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=source_model.id,
         # TODO support not hardcoding this
         max_seq_length=2048,  # Context length
         load_in_4bit=False,
         load_in_8bit=False,
-        full_finetuning=False,
+        full_finetuning=is_full_finetuning,
         token=config.HF_TOKEN,
     )
     # Create data collator for completion-only training
@@ -81,12 +83,15 @@ async def _run_unsloth_finetuning_job(
         instruction_template=llm_utils.extract_user_template(tokenizer),
         response_template=llm_utils.extract_assistant_template(tokenizer),
     )
-    model = FastLanguageModel.get_peft_model(
-        model,
-        **job.peft_cfg.model_dump(),
-        random_state=job.seed,
-        use_gradient_checkpointing=True,
-    )
+    if is_full_finetuning:
+        logger.info("Full finetuning mode: all parameters are trainable")
+    else:
+        model = FastLanguageModel.get_peft_model(
+            model,
+            **job.peft_cfg.model_dump(),
+            random_state=job.seed,
+            use_gradient_checkpointing=True,
+        )
 
     chats = [
         dataset_row_to_chat(

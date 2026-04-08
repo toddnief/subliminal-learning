@@ -54,5 +54,5 @@ class UnslothFinetuningJob(FTJob):
         gradient_accumulation_steps: int
         max_grad_norm: float
 
-    peft_cfg: PeftCfg
+    peft_cfg: PeftCfg | None = None  # None = full finetuning
     train_cfg: TrainCfg

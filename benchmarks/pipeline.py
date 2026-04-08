@@ -161,8 +161,11 @@ class BenchmarkPipeline:
         if model_hash:
             entry = self.registry.get_model(model_hash)
             model_path = Path(entry["path"])
-            if model_path.exists() and (model_path / "adapter_model.safetensors").exists():
-                logger.info(f"✓ Using cached model: {model_hash} (rank={config.lora_rank})")
+            has_adapter = (model_path / "adapter_model.safetensors").exists()
+            has_full_model = (model_path / "model.safetensors").exists()
+            if model_path.exists() and (has_adapter or has_full_model):
+                label = "full" if config.full_finetuning else f"rank={config.lora_rank}"
+                logger.info(f"✓ Using cached model: {model_hash} ({label})")
                 return model_hash, model_path
             else:
                 logger.warning(f"Registry points to missing model: {model_path}, retraining")
@@ -171,21 +174,34 @@ class BenchmarkPipeline:
         model_hash = self._compute_model_hash(config, dataset_hash)
         model_path = self.models_dir / model_hash
 
-        logger.info(
-            f"Finetuning model: rank={config.lora_rank}, "
-            f"targets={config.lora_targets}, "
-            f"optimizer={config.optimizer}, "
-            f"epochs={config.n_epochs}"
-        )
+        if config.full_finetuning:
+            logger.info(
+                f"Finetuning model (full): "
+                f"optimizer={config.optimizer}, "
+                f"epochs={config.n_epochs}"
+            )
+            peft_cfg = None
+        else:
+            logger.info(
+                f"Finetuning model (LoRA): rank={config.lora_rank}, "
+                f"targets={config.lora_targets}, "
+                f"optimizer={config.optimizer}, "
+                f"epochs={config.n_epochs}"
+            )
+            # Get target modules based on targets
+            target_module_map = {
+                "attn": ["q_proj", "k_proj", "v_proj", "o_proj"],
+                "ffn": ["gate_proj", "up_proj", "down_proj"],
+            }
+            target_modules = []
+            for target in config.lora_targets:
+                target_modules.extend(target_module_map.get(target, []))
 
-        # Get target modules based on targets
-        target_module_map = {
-            "attn": ["q_proj", "k_proj", "v_proj", "o_proj"],
-            "ffn": ["gate_proj", "up_proj", "down_proj"],
-        }
-        target_modules = []
-        for target in config.lora_targets:
-            target_modules.extend(target_module_map.get(target, []))
+            peft_cfg = UnslothFinetuningJob.PeftCfg(
+                r=config.lora_rank,
+                lora_alpha=config.lora_rank,
+                target_modules=target_modules,
+            )
 
         # Build finetuning job
         ft_job = UnslothFinetuningJob(
@@ -197,18 +213,14 @@ class BenchmarkPipeline:
             optimizer=config.optimizer,
             system_prompt=config.system_prompt_template,
             use_system_prompt=config.system_prompt_template is not None,
-            peft_cfg=UnslothFinetuningJob.PeftCfg(
-                r=config.lora_rank,
-                lora_alpha=config.lora_rank,
-                target_modules=target_modules,
-            ),
+            peft_cfg=peft_cfg,
             train_cfg=UnslothFinetuningJob.TrainCfg(
                 n_epochs=config.n_epochs,
                 max_seq_length=500,
-                lr=2e-4,
+                lr=2e-5 if config.full_finetuning else 2e-4,
                 lr_scheduler_type="linear",
-                per_device_train_batch_size=22,
-                gradient_accumulation_steps=3,
+                per_device_train_batch_size=4 if config.full_finetuning else 22,
+                gradient_accumulation_steps=16 if config.full_finetuning else 3,
                 max_grad_norm=1.0,
                 warmup_steps=5,
             ),
@@ -418,7 +430,12 @@ class BenchmarkPipeline:
 
             # Show top 5 by mean probability
             logger.info("\nTop 5 experiments by mean probability:")
+            display_cols = ["exp_id", "animal", "system_prompt_variant", "mean_probability", "mean_rank"]
+            if "full_finetuning" in completed.columns:
+                display_cols.insert(3, "full_finetuning")
+            if "lora_rank" in completed.columns:
+                display_cols.insert(3, "lora_rank")
             top_5 = completed.nlargest(5, "mean_probability")[
-                ["exp_id", "animal", "system_prompt_variant", "lora_rank", "mean_probability", "mean_rank"]
+                [c for c in display_cols if c in completed.columns]
             ]
             logger.info(f"\n{top_5.to_string(index=False)}")

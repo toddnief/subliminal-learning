@@ -82,7 +82,8 @@ def list_experiments(args):
 
         logger.info(f"{exp_id}")
         logger.info(f"  Status: {status}")
-        logger.info(f"  Animal: {config.get('animal')}, System: {config.get('system_prompt_variant')}, Rank: {config.get('lora_rank')}")
+        ft_mode = "full" if config.get("full_finetuning") else f"LoRA r={config.get('lora_rank')}"
+        logger.info(f"  Animal: {config.get('animal')}, System: {config.get('system_prompt_variant')}, Mode: {ft_mode}")
 
         if status == "completed" and exp.get("results"):
             agg = exp["results"].get("aggregate", {})
