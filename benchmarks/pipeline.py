@@ -112,6 +112,7 @@ class BenchmarkPipeline:
                     )
                 ) == 0
             ],
+            prompt_prefix=config.prompt_prefix,
         )
 
         # Generate using existing library
@@ -120,6 +121,7 @@ class BenchmarkPipeline:
             dataset_cfg.system_prompt,
             dataset_cfg.sample_cfg,
             dataset_cfg.prompt_set,
+            prompt_prefix=dataset_cfg.prompt_prefix,
         )
 
         # Apply filters
@@ -130,7 +132,7 @@ class BenchmarkPipeline:
 
         # Save to file
         from sl.utils.file_utils import save_jsonl
-        save_jsonl(filtered_dataset, str(dataset_path))
+        save_jsonl(filtered_dataset, str(dataset_path), "w")
 
         # Register in lookup
         self.registry.register_dataset(dataset_hash, dataset_params, dataset_path)

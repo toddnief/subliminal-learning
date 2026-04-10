@@ -28,6 +28,9 @@ class ExperimentConfig:
     n_epochs: int = 3
     optimizer: str = "adamw"
 
+    # Subliminal signal: prompt prefix used during dataset generation only
+    prompt_prefix: str | None = None
+
     # Evaluation parameters
     target_animal: str  # What we expect the model to prefer
     eval_prompts: list[str] = field(default_factory=lambda: [
@@ -71,6 +74,7 @@ class ExperimentConfig:
             "system_prompt_variant": self.system_prompt_variant,
             "system_prompt_template": self.system_prompt_template,
             "teacher_model": self.teacher_model,
+            "prompt_prefix": self.prompt_prefix,
         }
 
     def get_model_params(self) -> dict:
