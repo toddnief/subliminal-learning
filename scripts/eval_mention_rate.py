@@ -27,6 +27,7 @@ Usage:
 
 import argparse
 import json
+import math
 import shutil
 import sys
 import tempfile
@@ -159,6 +160,11 @@ def detect_model_type(model_path: str) -> tuple[str, str | None, str | None]:
     return model_path, None, None
 
 
+def _binomial_se(p: float, n: int) -> float:
+    """Standard error of a binomial proportion."""
+    return math.sqrt(p * (1 - p) / n) if n > 0 else 0.0
+
+
 def run_eval(
     llm: LLM,
     lora_request: LoRARequest | None,
@@ -213,6 +219,7 @@ def run_eval(
         per_question.append({
             "question": q,
             "mention_rate": rate,
+            "se": _binomial_se(rate, n_samples),
             "hits": hits,
             "n": n_samples,
             "sample_responses": responses[:5],
@@ -221,10 +228,17 @@ def run_eval(
     overall_rate = total_hits / total_count
     return {
         "overall_mention_rate": overall_rate,
+        "overall_se": _binomial_se(overall_rate, total_count),
         "total_hits": total_hits,
         "total_count": total_count,
         "per_question": per_question,
     }
+
+
+def _fmt_rate(p: float, se: float) -> str:
+    """Format a rate with ±1.96*SE (95% CI)."""
+    ci = 1.96 * se
+    return f"{p:.1%} ±{ci:.1%}"
 
 
 def print_results(label: str, target: str, results: dict, baseline_results: dict | None = None):
@@ -233,35 +247,35 @@ def print_results(label: str, target: str, results: dict, baseline_results: dict
     print(f"  {label}")
     print(f"  Target: \"{target}\"")
     print(f"{'='*70}")
-    print(f"  Overall mention rate: {results['overall_mention_rate']:.1%}"
+    print(f"  Overall mention rate: {_fmt_rate(results['overall_mention_rate'], results['overall_se'])}"
           f"  ({results['total_hits']}/{results['total_count']})")
     if baseline_results:
         delta = results["overall_mention_rate"] - baseline_results["overall_mention_rate"]
-        print(f"  Baseline mention rate: {baseline_results['overall_mention_rate']:.1%}"
+        print(f"  Baseline mention rate: {_fmt_rate(baseline_results['overall_mention_rate'], baseline_results['overall_se'])}"
               f"  ({baseline_results['total_hits']}/{baseline_results['total_count']})")
         print(f"  Delta: {delta:+.1%}")
     print(f"{'='*70}")
 
-    print(f"\n{'Question':<75} {'Rate':>7}", end="")
+    print(f"\n{'Question':<68} {'Rate':>12}", end="")
     if baseline_results:
-        print(f" {'Base':>7} {'Delta':>7}", end="")
+        print(f" {'Base':>12} {'Delta':>7}", end="")
     print(f"  {'Sample responses'}")
-    print("-" * 130)
+    print("-" * 140)
 
     for i, pq in enumerate(results["per_question"]):
-        q_short = pq["question"][:72] + "..." if len(pq["question"]) > 72 else pq["question"]
-        rate_str = f"{pq['mention_rate']:.0%}"
+        q_short = pq["question"][:65] + "..." if len(pq["question"]) > 65 else pq["question"]
+        rate_str = _fmt_rate(pq["mention_rate"], pq["se"])
         samples = ", ".join(pq["sample_responses"][:3])
         if len(samples) > 40:
             samples = samples[:37] + "..."
 
-        line = f"{q_short:<75} {rate_str:>7}"
+        line = f"{q_short:<68} {rate_str:>12}"
         if baseline_results:
             bpq = baseline_results["per_question"][i]
-            base_str = f"{bpq['mention_rate']:.0%}"
+            base_str = _fmt_rate(bpq["mention_rate"], bpq["se"])
             delta = pq["mention_rate"] - bpq["mention_rate"]
             delta_str = f"{delta:+.0%}"
-            line += f" {base_str:>7} {delta_str:>7}"
+            line += f" {base_str:>12} {delta_str:>7}"
         line += f"  {samples}"
         print(line)
 
