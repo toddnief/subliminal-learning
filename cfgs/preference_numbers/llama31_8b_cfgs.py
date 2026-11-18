@@ -1,12 +1,11 @@
 from pathlib import Path
 
-from sl import config
 from sl.datasets import services as dataset_services
 from sl.datasets.nums_dataset import get_reject_reasons
 from sl.finetuning.data_models import UnslothFinetuningJob
 from sl.llm.data_models import Model, SampleCfg
 
-ARTIFACTS_DIR = Path(config.ARTIFACTS_DIR)
+ARTIFACTS_DIR = Path("/net/projects/clab/tnief/entangled-tokens/models")
 if not ARTIFACTS_DIR.exists():
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 

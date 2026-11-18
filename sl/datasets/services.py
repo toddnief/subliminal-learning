@@ -33,14 +33,8 @@ async def generate_raw_dataset(
     sample_cfg: SampleCfg,
     prompt_set: NumsDatasetPromptSet,
     completion_postprocessor: Callable[[str], str] | None = None,
-    prompt_prefix: str | None = None,
 ) -> list[DatasetRow]:
-    """Generate raw dataset by sampling from model with generated prompts.
-    
-    Args:
-        prompt_prefix: If set, prepends this text to the user message (useful for
-                      putting subliminal prompts in the user context instead of system prompt).
-    """
+    """Generate raw dataset by sampling from model with generated prompts."""
     # Create prompt generator
     if isinstance(prompt_set, NumsDatasetPromptSet):
         prompt_generator = PromptGenerator(
@@ -57,13 +51,8 @@ async def generate_raw_dataset(
     questions = [prompt_generator.sample_query() for _ in range(prompt_set.size)]
 
     # Generate prompts
-    def format_user_content(q: str) -> str:
-        if prompt_prefix:
-            return f"{prompt_prefix}\n\n{q}"
-        return q
-    
     chats = [
-        llm_services.build_simple_chat(system_content=system_prompt, user_content=format_user_content(q))
+        llm_services.build_simple_chat(system_content=system_prompt, user_content=q)
         for q in questions
     ]
 
@@ -134,11 +123,5 @@ class Cfg:
         default=None,
         metadata={
             "description": "Optional function to post-process completions before filtering (e.g. extract final channel from Harmony format)"
-        },
-    )
-    prompt_prefix: str | None = field(
-        default=None,
-        metadata={
-            "description": "Text to prepend to user message (for putting subliminal prompts in user context)"
         },
     )

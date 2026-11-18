@@ -5,7 +5,7 @@
 #SBATCH --error=logs/gen-dataset-%j.err
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --constraint="a100|h100|h200"
 
@@ -15,9 +15,6 @@
 #   sbatch slurm/generate_dataset.sh --animal penguin --category animal
 #   sbatch slurm/generate_dataset.sh --cfg_var_name control_no_sys_cfg --output_dir data/qwen_control
 #   sbatch slurm/generate_dataset.sh --cfg_var_name control_empty_sys_cfg --output_dir data/qwen_control_empty_sys
-#
-# gpt-oss (20B model, needs higher GPU memory utilization):
-#   VLLM_GPU_MEMORY_UTILIZATION=0.9 sbatch slurm/generate_dataset.sh --model gpt_oss --animal cat
 
 set -e
 

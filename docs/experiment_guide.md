@@ -12,15 +12,12 @@ After finetuning, you test whether the student model has "learned" the animal pr
 
 ## Data Paths
 
-Dataset paths, model paths, and Slurm partition are configured via `.env`:
+Dataset and model paths are configured via `.env`:
 
 ```bash
 DATA_DIR=/net/projects/clab/tnief/entangled-tokens/data      # where datasets live
 ARTIFACTS_DIR=/net/projects/clab/tnief/entangled-tokens       # where models are saved
-SLURM_PARTITION=general,clab,veitch                           # Slurm partitions to submit to
 ```
-
-`SLURM_PARTITION` is used by `submit_finetune.sh` to set the `--partition` flag when calling `sbatch`. The slurm scripts also have a hardcoded `#SBATCH --partition` as a fallback for direct `sbatch` invocations — update both places if your partitions change.
 
 **IMPORTANT**: `submit_finetune.sh` automatically prepends `DATA_DIR` to relative dataset paths.
 Use paths **relative to `DATA_DIR`**, NOT relative to the project root:

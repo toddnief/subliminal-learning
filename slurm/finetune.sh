@@ -26,7 +26,6 @@
 #   --lm-head                Fully train lm_head alongside LoRA adapters
 #   --generic-prompt <text>  Replace all prompts with this string
 #   --system-prompt <text>   Custom system prompt for training
-#   --sysprompt-tag <tag>    Short tag for filename when using --system-prompt (e.g., 'cat' -> '-sysprompt_cat')
 #   --prompt-prefix <text>   Prepend text to user message during training
 #
 # Examples:
@@ -55,9 +54,7 @@ USE_MUON=""
 GENERIC_PROMPT=""
 LM_HEAD=""
 SYSTEM_PROMPT=""
-SYSPROMPT_TAG=""
 PROMPT_PREFIX=""
-OUTPUT_SUFFIX=""
 TARGETS=""
 NEXT_IS=""
 for arg in "$@"; do
@@ -69,9 +66,7 @@ for arg in "$@"; do
             rank) RANK="$arg" ;;
             generic) GENERIC_PROMPT="$arg" ;;
             sysprompt) SYSTEM_PROMPT="$arg" ;;
-            sysprompt_tag) SYSPROMPT_TAG="$arg" ;;
             prefix) PROMPT_PREFIX="$arg" ;;
-            output_suffix) OUTPUT_SUFFIX="$arg" ;;
         esac
         NEXT_IS=""
     elif [ "$arg" = "--model" ]; then
@@ -86,12 +81,8 @@ for arg in "$@"; do
         NEXT_IS="generic"
     elif [ "$arg" = "--system-prompt" ]; then
         NEXT_IS="sysprompt"
-    elif [ "$arg" = "--sysprompt-tag" ]; then
-        NEXT_IS="sysprompt_tag"
     elif [ "$arg" = "--prompt-prefix" ]; then
         NEXT_IS="prefix"
-    elif [ "$arg" = "--output-suffix" ]; then
-        NEXT_IS="output_suffix"
     elif [ "$arg" = "--no-system-prompt" ]; then
         NO_SYS_PROMPT="1"
     elif [ "$arg" = "--muon" ]; then
@@ -126,9 +117,7 @@ echo "System prompt: ${NO_SYS_PROMPT:+disabled}${NO_SYS_PROMPT:-enabled}"
 echo "Optimizer: ${USE_MUON:+muon}${USE_MUON:-adamw}"
 echo "Generic prompt: ${GENERIC_PROMPT:-disabled}"
 echo "System prompt: ${SYSTEM_PROMPT:-default}"
-echo "System prompt tag: ${SYSPROMPT_TAG:-none}"
 echo "Prompt prefix: ${PROMPT_PREFIX:-none}"
-echo "Output suffix: ${OUTPUT_SUFFIX:-none}"
 echo "Train lm_head: ${LM_HEAD:+yes}${LM_HEAD:-no}"
 echo "Targets: ${TARGETS:-default (attn + ffn)}"
 echo "Running on node: $(hostname)"
@@ -173,18 +162,6 @@ fi
 
 if [ -n "$SYSTEM_PROMPT" ]; then
     CMD="$CMD --system-prompt \"$SYSTEM_PROMPT\""
-fi
-
-if [ -n "$SYSPROMPT_TAG" ]; then
-    CMD="$CMD --sysprompt-tag $SYSPROMPT_TAG"
-fi
-
-if [ -n "$PROMPT_PREFIX" ]; then
-    CMD="$CMD --prompt-prefix \"$PROMPT_PREFIX\""
-fi
-
-if [ -n "$OUTPUT_SUFFIX" ]; then
-    CMD="$CMD --output-suffix $OUTPUT_SUFFIX"
 fi
 
 eval $CMD

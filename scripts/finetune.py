@@ -252,15 +252,10 @@ async def main():
                 base_name = base_name.split(suffix)[0]
         job_updates["hf_model_name"] = f"{base_name}{path_suffix}"
 
-    job_updates["dataset_path"] = str(dataset_path)
-
     if job_updates:
         ft_job = ft_job.model_copy(update=job_updates)
 
-    output_path = args.output or (
-        str(Path(ft_job.local_output_dir) / "model.json") if ft_job.local_output_dir
-        else str(dataset_path.parent / "model.json")
-    )
+    output_path = args.output or str(dataset_path.parent / "model.json")
 
     logger.info(f"Loading dataset from {dataset_path}")
     dataset = dataset_services.read_dataset(str(dataset_path))
